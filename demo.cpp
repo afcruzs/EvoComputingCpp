@@ -2,6 +2,7 @@
 #include <sys/time.h>
 #include <cstdio>
 #include <unistd.h>
+#include "EvolutionaryStrategies/EvolutionaryAlgorithm.h"
 
 int main(){
   /*  Test the basic benchmark function */
@@ -12,27 +13,31 @@ int main(){
   // unsigned funToRun[] = {1};
   // unsigned funToRun[] = {15};
   unsigned funNum = 15;
-  unsigned run = 1;
+  unsigned iterations = 1000;
 
   vector<double> runTimeVec;
   struct timeval start, end;
-  long seconds, useconds;    
+  long seconds, useconds;
   double mtime;
-        
+
   X = new double[dim];
   for (unsigned i=0; i<dim; i++){
     X[i]=0;
   }
 
+
+  EvolutionaryAlgorithm* algorithm = new EvolutionaryAlgorithm();
+
+
   for (unsigned i=0; i<funNum; i++){
-    fp = generateFuncObj(funToRun[i]); 
-    printf("F %d value = %1.20E\n", fp->getID(), fp->compute(X));
+    fp = generateFuncObj(funToRun[i]);
+    fp->compute(X);
+    CECAdapter* adapter = new CECAdapter(fp);
+
     gettimeofday(&start, NULL);
-    for (unsigned j=0; j < run; j++){
-      fp->compute(X);
-    }
+    printf("F %d value = %1.20E\n", fp->getID(), algorithm->optimize( adapter, iterations ) );
     gettimeofday(&end, NULL);
-    
+
     seconds  = end.tv_sec  - start.tv_sec;
     useconds = end.tv_usec - start.tv_usec;
 
@@ -40,11 +45,12 @@ int main(){
 
     runTimeVec.push_back(mtime);
     printf ( "F %d, Running Time = %f s\n\n", fp->getID(), mtime);
-    
-    delete fp;
+
+    delete adapter;
   }
 
   delete []X;
+  delete algorithm;
 
   // for (unsigned i=0; i<runTimeVec.size(); i++){
   // 	printf ( "%f\n", runTimeVec[i] );
