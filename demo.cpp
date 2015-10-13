@@ -4,6 +4,11 @@
 #include <unistd.h>
 #include "EvolutionaryStrategies/EvolutionaryAlgorithm.h"
 
+
+void xd(FitnessFunction* a,vector<double*> b){
+  printf("oye zi\n");
+}
+
 int main(){
   /*  Test the basic benchmark function */
   double* X;
@@ -26,7 +31,7 @@ int main(){
   }
 
 
-  EvolutionaryAlgorithm* algorithm = new EvolutionaryAlgorithm();
+  EvolutionaryAlgorithm* algorithm = new EvolutionaryAlgorithm(xd,xd,xd);
 
 
   for (unsigned i=0; i<funNum; i++){
