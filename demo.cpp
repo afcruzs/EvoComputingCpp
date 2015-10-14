@@ -2,14 +2,158 @@
 #include <sys/time.h>
 #include <cstdio>
 #include <unistd.h>
+#include <algorithm>
 #include "EvolutionaryStrategies/EvolutionaryAlgorithm.h"
 
+std::mt19937 rng;
+bool randInit = false;
 
-void xd(FitnessFunction* a,vector<double*> b){
-  printf("oye zi\n");
+void initRandomIfNeeded(){
+  if( !randInit ){
+    rng.seed(std::random_device()());
+    randInit = true;
+  }
+}
+
+double gaussian(double mean, double stddeviation){
+  initRandomIfNeeded();
+  std::normal_distribution<double> normal_dist(mean, stddeviation);
+  return normal_dist(rng);
+}
+
+double gaussian(){
+  return gaussian(0.0,1.0);
+}
+
+double uniform(double lowerbound, double upperbound){
+  initRandomIfNeeded();
+  std::uniform_real_distribution<double> dis(lowerbound,upperbound);
+  return dis(rng);
+}
+
+double uniform(){
+  return uniform(0.0,1.0);
+}
+
+int uniformInt(int lowerbound, int upperbound){
+  initRandomIfNeeded();
+  std::uniform_int_distribution<int> dis(lowerbound,upperbound);
+  return dis(rng);
+}
+
+int uniformInt(){
+  return uniform(0,1);
+}
+
+bool nextBoolean(){
+  return uniform() <= 0.5;
+}
+
+void selection(FitnessFunction* problem, vector<double*>& population){
+    printf("Selection\n");
+    double* a = new double[population.size()];
+    unsigned n = population.size();
+    for(unsigned i=0; i<n; i++)
+        a[i] = -1*problem->evaluate( population[i] );
+
+    double extra = abs(*min_element(a,a+n));
+    for(unsigned i=0; i<n; i++)
+        a[i] += extra;
+
+    for(unsigned i=1; i<n; i++)
+        a[i] = a[i-1] + a[i];
+
+    double maxm = a[n-1];
+    for(unsigned i=0; i<n; i++) a[i] /= maxm;
+    vector<double*> buffer;
+    for(unsigned k=0; k<n; k++){
+        unsigned low = 0, high = population.size()-1;
+        unsigned mid;
+
+             double p = gaussian();
+             while( low < high && high-low > 1 ){
+                 mid = (low+high) / 2;
+                 if( p <= a[mid] )
+                     high = mid;
+                 else
+                     low = mid;
+             }
+
+             if( a[low] > p )
+                 buffer.push_back( population[low] );
+             else
+                 buffer.push_back( population[high] );
+    }
+
+    population.clear();
+    population.insert(population.end(),buffer.begin(),buffer.end());
+    buffer.clear();
+    delete[] a;
+}
+
+void crossover(FitnessFunction* problem, vector<double*>& population, unsigned dimension){
+  printf("Crossover\n");
+    vector<double*> buffer;
+
+    for(unsigned k=0; k<population.size(); k+=2){
+        unsigned piv = uniformInt( 0, dimension );
+
+        double* o1 = new double[dimension];
+        double* o2 = new double[dimension];
+
+        for(unsigned i=0; i<piv; i++){
+            o1[i] = population[k][i];
+            o2[i] = population[k+1][i];
+        }
+
+        for(unsigned i=piv; i<dimension; i++){
+            o1[i] = population[k+1][i];
+            o2[i] = population[k][i];
+        }
+
+
+        if( !problem->satisfy(o1,dimension) )
+            copy(population[k],population[k]+dimension,o1);
+            //deepCopyArray(population[k],o1);
+
+        if( !problem->satisfy(o2,dimension) )
+            copy(population[k+1],population[k+1]+dimension,o2);
+            //deepCopyArray(population[k+1],o2);
+
+
+        buffer.push_back(o1);
+        buffer.push_back(o2);
+    }
+
+    population.clear();
+    population.insert(population.end(),buffer.begin(),buffer.end());
+    buffer.clear();
+
+}
+
+void mutation(FitnessFunction* problem, vector<double*>& population, unsigned dimension){
+  printf("Mutation\n");
+  for(unsigned i=0; i<population.size(); i++){
+        if( nextBoolean() ){
+            double* xd = new double[dimension];
+            copy(population[i], population[i]+dimension, xd);
+            for(unsigned k=0; k<dimension; k++){
+                if( nextBoolean() )
+                    population[i][k] += gaussian(0.0, 10.1);
+            }
+
+            if( !problem->satisfy(population[i], dimension) )
+                population[i] = xd;
+            else
+              delete [] xd;
+
+        }
+    }
+    
 }
 
 int main(){
+   randInit = false;
   /*  Test the basic benchmark function */
   double* X;
   Benchmarks* fp=NULL;
@@ -18,7 +162,7 @@ int main(){
   // unsigned funToRun[] = {1};
   // unsigned funToRun[] = {15};
   unsigned funNum = 15;
-  unsigned iterations = 1000;
+  unsigned iterations = 1;
 
   vector<double> runTimeVec;
   struct timeval start, end;
@@ -31,7 +175,7 @@ int main(){
   }
 
 
-  EvolutionaryAlgorithm* algorithm = new EvolutionaryAlgorithm(xd,xd,xd);
+  EvolutionaryAlgorithm* algorithm = new EvolutionaryAlgorithm(selection,crossover,mutation);
 
 
   for (unsigned i=0; i<funNum; i++){
@@ -40,7 +184,7 @@ int main(){
     CECAdapter* adapter = new CECAdapter(fp);
 
     gettimeofday(&start, NULL);
-    printf("F %d value = %1.20E\n", fp->getID(), algorithm->optimize( adapter, iterations ) );
+    printf("F %d value = %1.20E\n", fp->getID(), algorithm->optimize( adapter, iterations, dim ) );
     gettimeofday(&end, NULL);
 
     seconds  = end.tv_sec  - start.tv_sec;
