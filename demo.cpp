@@ -42,15 +42,15 @@ int uniformInt(int lowerbound, int upperbound){
 }
 
 int uniformInt(){
-  return uniform(0,1);
+  return uniformInt(0,1);
 }
 
 bool nextBoolean(){
   return uniform() <= 0.5;
 }
 
-void selection(FitnessFunction* problem, vector<double*>& population){
-    printf("Selection\n");
+void selection(FitnessFunction* problem, vector<double*>& population, unsigned dimension){
+    //printf("Selection\n");
     double* a = new double[population.size()];
     unsigned n = population.size();
     for(unsigned i=0; i<n; i++)
@@ -65,7 +65,7 @@ void selection(FitnessFunction* problem, vector<double*>& population){
 
     double maxm = a[n-1];
     for(unsigned i=0; i<n; i++) a[i] /= maxm;
-    vector<double*> buffer;
+    vector<unsigned> buffer;
     for(unsigned k=0; k<n; k++){
         unsigned low = 0, high = population.size()-1;
         unsigned mid;
@@ -80,20 +80,23 @@ void selection(FitnessFunction* problem, vector<double*>& population){
              }
 
              if( a[low] > p )
-                 buffer.push_back( population[low] );
+                 buffer.push_back( low );
              else
-                 buffer.push_back( population[high] );
+                 buffer.push_back( high );
     }
 
-    population.clear();
-    population.insert(population.end(),buffer.begin(),buffer.end());
+    for(unsigned i=0; i<buffer.size(); i++){
+      for(unsigned j=0; j<dimension; j++){
+        population[i][j] = population[ buffer[i] ][j];
+      }
+    }
+
     buffer.clear();
     delete[] a;
 }
 
 void crossover(FitnessFunction* problem, vector<double*>& population, unsigned dimension){
-  printf("Crossover\n");
-    vector<double*> buffer;
+  //printf("Crossover\n");
 
     for(unsigned k=0; k<population.size(); k+=2){
         unsigned piv = uniformInt( 0, dimension );
@@ -112,44 +115,46 @@ void crossover(FitnessFunction* problem, vector<double*>& population, unsigned d
         }
 
 
-        if( !problem->satisfy(o1,dimension) )
-            copy(population[k],population[k]+dimension,o1);
-            //deepCopyArray(population[k],o1);
+        if( problem->satisfy(o1,dimension) )
+          for(unsigned i=0; i<dimension; i++)
+            population[k][i] = o1[i];
 
-        if( !problem->satisfy(o2,dimension) )
-            copy(population[k+1],population[k+1]+dimension,o2);
-            //deepCopyArray(population[k+1],o2);
+        if( problem->satisfy(o2,dimension) )
+          for(unsigned i=0; i<dimension; i++)
+            population[k+1][i] = o2[i];
 
-
-        buffer.push_back(o1);
-        buffer.push_back(o2);
+        delete []o1;
+        delete []o2;
     }
 
-    population.clear();
-    population.insert(population.end(),buffer.begin(),buffer.end());
-    buffer.clear();
+    //population.clear();
+    //population.insert(population.end(),buffer.begin(),buffer.end());
+
 
 }
 
 void mutation(FitnessFunction* problem, vector<double*>& population, unsigned dimension){
-  printf("Mutation\n");
+  //printf("Mutation\n");
   for(unsigned i=0; i<population.size(); i++){
         if( nextBoolean() ){
-            double* xd = new double[dimension];
-            copy(population[i], population[i]+dimension, xd);
+            vector<double> randMut(dimension);
             for(unsigned k=0; k<dimension; k++){
-                if( nextBoolean() )
-                    population[i][k] += gaussian(0.0, 10.1);
+                randMut[k] = 0.0;
+                if( nextBoolean() ){
+                    randMut[k] = gaussian(0.0, 10.1);
+                    population[i][k] += randMut[k];
+                  }
             }
 
-            if( !problem->satisfy(population[i], dimension) )
-                population[i] = xd;
-            else
-              delete [] xd;
+            if( !problem->satisfy(population[i],dimension) ){
+              for(unsigned k=0; k<dimension; k++)
+                population[i][k] -= randMut[k];
+            }
 
+            randMut.clear();
         }
     }
-    
+
 }
 
 int main(){
@@ -158,11 +163,11 @@ int main(){
   double* X;
   Benchmarks* fp=NULL;
   unsigned dim = 1000;
-  unsigned funToRun[] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+  unsigned funToRun[] = {13};
   // unsigned funToRun[] = {1};
   // unsigned funToRun[] = {15};
-  unsigned funNum = 15;
-  unsigned iterations = 1;
+  unsigned funNum = 1;
+  unsigned iterations = 1000;
 
   vector<double> runTimeVec;
   struct timeval start, end;
@@ -174,8 +179,8 @@ int main(){
     X[i]=0;
   }
 
-
-  EvolutionaryAlgorithm* algorithm = new EvolutionaryAlgorithm(selection,crossover,mutation);
+  unsigned POP_SIZE = 50;
+  EvolutionaryAlgorithm* algorithm = new EvolutionaryAlgorithm(selection,crossover,mutation,POP_SIZE);
 
 
   for (unsigned i=0; i<funNum; i++){
